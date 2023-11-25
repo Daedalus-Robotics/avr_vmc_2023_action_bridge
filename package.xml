@@ -1,18 +1,22 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>avr_vmc_2023_action_bridge</name>
-  <version>0.0.0</version>
-  <description></description>
-  <maintainer email="hunterbaker@me.com">Hunter Baker</maintainer>
-  <license>LGPL-3.0-only</license>
+    <name>avr_vmc_2023_action_bridge</name>
+    <version>0.0.0</version>
+    <description>A node to convert actions to topics and services to be used over rosbridge</description>
+    <maintainer email="hunterbaker@me.com">Hunter Baker</maintainer>
+    <license>LGPL-3.0-only</license>
 
-  <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
+    <depend>rclpy</depend>
+    <depend>avr_vmc_2023_action_bridge_interfaces</depend>
+    <depend>avr_vmc_2023_auton_drop_interfaces</depend>
 
-  <export>
-    <build_type>ament_python</build_type>
-  </export>
+    <test_depend>ament_copyright</test_depend>
+    <test_depend>ament_flake8</test_depend>
+    <test_depend>ament_pep257</test_depend>
+    <test_depend>python3-pytest</test_depend>
+
+    <export>
+        <build_type>ament_python</build_type>
+    </export>
 </package>

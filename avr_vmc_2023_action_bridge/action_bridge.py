@@ -61,6 +61,8 @@ class ActionBridgeNode(Node):
 
         self.goal_futures: List[Future | None] = [None] * len(self.action_clients)
 
+        self.get_logger().info('Started')
+
     def send_goal(self, request: Goal.Request, response: Goal.Response) -> Goal.Response:
         if 0 <= request.id < len(self.action_clients):
             client_info = self.action_clients[request.id]
