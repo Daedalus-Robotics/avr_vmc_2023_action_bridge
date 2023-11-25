@@ -14,7 +14,7 @@ setup(
     zip_safe=True,
     maintainer='Hunter Baker',
     maintainer_email='hunterbaker@me.com',
-    description='',
+    description='A node to convert actions to topics and services to be used over rosbridge',
     license='LGPL-3.0-only',
     tests_require=['pytest'],
     entry_points={
