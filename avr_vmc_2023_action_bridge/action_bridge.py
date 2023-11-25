@@ -65,7 +65,7 @@ class ActionBridgeNode(Node):
 
         self.get_logger().info('Started')
 
-    def send_goal(self, request: Goal.Request, response: Goal.Response) -> Goal.Response:
+    async def send_goal(self, request: Goal.Request, response: Goal.Response) -> Goal.Response:
         if 0 <= request.id < len(self.action_clients):
             client_info = self.action_clients[request.id]
             try:
@@ -81,20 +81,18 @@ class ActionBridgeNode(Node):
                     goal,
                     feedback_callback=lambda msg: self._send_feedback(request.id, msg)
                 )
+                handle_future.add_done_callback(lambda fut: self._goal_handle_callback(request.id, fut))
 
-                handle: ClientGoalHandle | None = None
-                start_timer = time.time()
-                while handle is None:
-                    handle = handle_future.result()
-                    if time.time() - start_timer >= 30:
-                        return response
-
-                result_future: Future = handle.get_result_async()
-                result_future.add_done_callback(lambda future: self._send_result(request.id, future))
-
-                self.goal_handles[request.id] = handle
-                response.success = handle.accepted
+                response.success = True
         return response
+
+    def _goal_handle_callback(self, goal_id: int, handle_future: Future) -> None:
+        handle = handle_future.result()
+
+        result_future: Future = handle.get_result_async()
+        result_future.add_done_callback(lambda future: self._send_result(goal_id, future))
+
+        self.goal_handles[goal_id] = handle
 
     def cancel(self, request: Cancel.Request, response: Cancel.Response) -> Cancel.Response:
         if 0 <= request.id < len(self.action_clients):
@@ -119,13 +117,12 @@ class ActionBridgeNode(Node):
         client_name = self.action_clients[action_id][0]
         self.get_logger().debug(f'Action \'{client_name}\' has finished')
 
-        result: Any = future.result()
-        if result is not None:
-            result_msg = Result()
-            result_msg.id = action_id
-            result_msg.data = self._convert_msg_to_json(result)
+        result: Any = future.result().result
+        result_msg = Result()
+        result_msg.id = action_id
+        result_msg.data = self._convert_msg_to_json(result)
 
-            self.result_publisher.publish(result_msg)
+        self.result_publisher.publish(result_msg)
 
     @staticmethod
     def _convert_msg_to_json(msg: Any) -> str:
