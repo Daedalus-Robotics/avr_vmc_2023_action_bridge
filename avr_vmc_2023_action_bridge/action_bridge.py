@@ -109,7 +109,7 @@ class ActionBridgeNode(Node):
 
         feedback = Feedback()
         feedback.id = action_id
-        feedback.data = self._convert_msg_to_json(msg)
+        feedback.data = self._convert_msg_to_json(msg.feedback)
 
         self.feedback_publisher.publish(feedback)
 
