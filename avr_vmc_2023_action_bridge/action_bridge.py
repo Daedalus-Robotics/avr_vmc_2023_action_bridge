@@ -1,9 +1,11 @@
 import json
+import time
 from typing import List, Tuple, Any
 
 import rclpy
 from rclpy import Future
 from rclpy.action import ActionClient
+from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
 
 from avr_vmc_2023_action_bridge_interfaces.srv import Goal, Cancel
@@ -59,7 +61,7 @@ class ActionBridgeNode(Node):
                 # noinspection PyProtectedMember
                 self.get_logger().warning(f'Could not find action: {client_info[0]}')
 
-        self.goal_futures: List[Future | None] = [None] * len(self.action_clients)
+        self.goal_handles: List[ClientGoalHandle | None] = [None] * len(self.action_clients)
 
         self.get_logger().info('Started')
 
@@ -74,46 +76,56 @@ class ActionBridgeNode(Node):
             else:
                 self.get_logger().debug(f'Calling action \'{client_info[0]}\' with data: {data}')
                 # noinspection PyUnresolvedReferences
-                goal = client_info[1].Goal(data)
-                self.goal_futures[request.id] = client_info[2].send_goal_async(
+                goal = client_info[1].Goal(**data)
+                handle_future: Future = client_info[2].send_goal_async(
                     goal,
                     feedback_callback=lambda msg: self._send_feedback(request.id, msg)
                 )
-                self.goal_futures[request.id].add_done_callback(lambda future: self._send_result(request.id, future))
-                response.success = True
+
+                handle: ClientGoalHandle | None = None
+                start_timer = time.time()
+                while handle is None:
+                    handle = handle_future.result()
+                    if time.time() - start_timer >= 30:
+                        return response
+
+                result_future: Future = handle.get_result_async()
+                result_future.add_done_callback(lambda future: self._send_result(request.id, future))
+
+                self.goal_handles[request.id] = handle
+                response.success = handle.accepted
         return response
 
     def cancel(self, request: Cancel.Request, response: Cancel.Response) -> Cancel.Response:
         if 0 <= request.id < len(self.action_clients):
             client_name = self.action_clients[request.id][0]
-            if self.goal_futures[request.id] is not None:
+            if self.goal_handles[request.id] is not None:
                 self.get_logger().debug(f'Canceling action \'{client_name}\'')
-                self.goal_futures[request.id].cancel()
+                self.goal_handles[request.id].cancel_goal_async()
                 response.success = True
         return response
 
     def _send_feedback(self, action_id: int, msg: Any) -> None:
-        if 0 <= action_id < len(self.action_clients):
-            client_name = self.action_clients[action_id][0]
-            self.get_logger().debug(f'Sending feedback for action: {client_name}')
+        client_name = self.action_clients[action_id][0]
+        self.get_logger().debug(f'Sending feedback for action: {client_name}')
 
-            feedback = Feedback()
-            feedback.id = action_id
-            feedback.data = self._convert_msg_to_json(msg)
+        feedback = Feedback()
+        feedback.id = action_id
+        feedback.data = self._convert_msg_to_json(msg)
 
-            self.feedback_publisher.publish(feedback)
+        self.feedback_publisher.publish(feedback)
 
     def _send_result(self, action_id: int, future: Future) -> None:
-        if 0 <= action_id < len(self.action_clients):
-            client_name = self.action_clients[action_id][0]
-            self.get_logger().debug(f'Action \'{client_name}\' has finished')
+        client_name = self.action_clients[action_id][0]
+        self.get_logger().debug(f'Action \'{client_name}\' has finished')
 
-            if not future.cancelled():
-                result = Result()
-                result.id = action_id
-                result.data = self._convert_msg_to_json(future.result())
+        result: Any = future.result()
+        if result is not None:
+            result_msg = Result()
+            result_msg.id = action_id
+            result_msg.data = self._convert_msg_to_json(result)
 
-                self.result_publisher.publish(result)
+            self.result_publisher.publish(result_msg)
 
     @staticmethod
     def _convert_msg_to_json(msg: Any) -> str:
