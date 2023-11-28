@@ -17,6 +17,7 @@ class ActionBridgeNode(Node):
     def __init__(self) -> None:
         super().__init__('avr_vmc_2023_action_bridge', namespace='action_bridge')
 
+        # noinspection PyTypeChecker
         self.goal_service = self.create_service(
             Goal,
             'goal',
@@ -114,15 +115,16 @@ class ActionBridgeNode(Node):
         self.feedback_publisher.publish(feedback)
 
     def _send_result(self, action_id: int, future: Future) -> None:
-        client_name = self.action_clients[action_id][0]
-        self.get_logger().debug(f'Action \'{client_name}\' has finished')
+        if not future.cancelled():
+            client_name = self.action_clients[action_id][0]
+            self.get_logger().debug(f'Action \'{client_name}\' has finished')
 
-        result: Any = future.result().result
-        result_msg = Result()
-        result_msg.id = action_id
-        result_msg.data = self._convert_msg_to_json(result)
+            result: Any = future.result().result
+            result_msg = Result()
+            result_msg.id = action_id
+            result_msg.data = self._convert_msg_to_json(result)
 
-        self.result_publisher.publish(result_msg)
+            self.result_publisher.publish(result_msg)
 
     @staticmethod
     def _convert_msg_to_json(msg: Any) -> str:
